@@ -35,6 +35,8 @@ interface EditorToolbarProps {
   isCopied: boolean;
   viewMode: 'editor' | 'split' | 'preview';
   onViewModeChange: (mode: 'editor' | 'split' | 'preview') => void;
+  isExplorerOpen: boolean;
+  onToggleExplorer: () => void;
 }
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({
@@ -50,11 +52,29 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   isCopied,
   viewMode,
   onViewModeChange,
+  isExplorerOpen,
+  onToggleExplorer,
 }) => {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 bg-neutral-900 border-b border-neutral-800 text-xs">
-      {/* Left controls: Language, Theme, Font, Layout */}
+      {/* Left controls: Explorer toggle, Language, Theme, Font, Layout */}
       <div className="flex flex-wrap items-center gap-2">
+        {/* Explorer toggle button */}
+        <button
+          onClick={onToggleExplorer}
+          title={isExplorerOpen ? '탐색기 닫기' : '탐색기 열기'}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border transition-colors font-medium ${
+            isExplorerOpen
+              ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300'
+              : 'bg-neutral-800/80 border-neutral-700/60 text-neutral-300 hover:text-white'
+          }`}
+        >
+          <FolderTree className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+          <span>탐색기</span>
+        </button>
+
+        <div className="h-4 w-px bg-neutral-800 hidden sm:block" />
+
         {/* Language select */}
         <div className="flex items-center gap-1.5 bg-neutral-800/80 px-2 py-1 rounded-md border border-neutral-700/60">
           <Code className="w-3.5 h-3.5 text-indigo-400 shrink-0" />

@@ -5,12 +5,13 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { openSearchPanel } from '@codemirror/search';
-import { Download, Code2, Sparkles, Terminal } from 'lucide-react';
+import { Download, Code2, Upload, FileText, CheckCircle2 } from 'lucide-react';
 
 import { EditorFile, SupportedLanguage, EditorSettings, SyntaxNodeInfo } from './types/editor';
-import { INITIAL_FILES, Snippet } from './languages/languages';
+import { INITIAL_FILES, Snippet, detectLanguageFromFilename } from './languages/languages';
 import { useCodeMirror } from './hooks/useCodeMirror';
 import { FileTabs } from './components/FileTabs';
+import { FileExplorer } from './components/FileExplorer';
 import { EditorToolbar } from './components/EditorToolbar';
 import { LivePreview } from './components/LivePreview';
 import { StatusBar } from './components/StatusBar';
@@ -20,6 +21,9 @@ import { InfoModal, InfoModalType } from './components/InfoModal';
 export default function App() {
   const [files, setFiles] = useState<EditorFile[]>(INITIAL_FILES);
   const [activeFileId, setActiveFileId] = useState<string>('file-1');
+  const [isExplorerOpen, setIsExplorerOpen] = useState<boolean>(true);
+  const [isEditorDragging, setIsEditorDragging] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Active file
   const activeFile = useMemo(() => {
@@ -81,6 +85,53 @@ export default function App() {
     setActiveFileId(fileId);
     setDocument(target.content);
   }, [files, setDocument]);
+
+  // Handle files dragged and dropped from OS file explorer or picker
+  const handleFilesDropped = useCallback(async (droppedFiles: FileList | File[]) => {
+    const fileArray = Array.from(droppedFiles);
+    if (fileArray.length === 0) return;
+
+    const newFilesToAdd: EditorFile[] = [];
+
+    for (const file of fileArray) {
+      try {
+        const text = await file.text();
+        const detectedLang = detectLanguageFromFilename(file.name);
+        const fileId = `file-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+        newFilesToAdd.push({
+          id: fileId,
+          name: file.name,
+          language: detectedLang,
+          content: text,
+        });
+      } catch (err) {
+        console.error('Failed to read file:', file.name, err);
+      }
+    }
+
+    if (newFilesToAdd.length > 0) {
+      setFiles((prev) => {
+        // If file with same name exists, remove old one so it gets updated
+        const newNames = new Set(newFilesToAdd.map((f) => f.name));
+        const filtered = prev.filter((f) => !newNames.has(f.name));
+        return [...filtered, ...newFilesToAdd];
+      });
+
+      // Open the latest dropped file in the editor
+      const lastFile = newFilesToAdd[newFilesToAdd.length - 1];
+      setActiveFileId(lastFile.id);
+      setDocument(lastFile.content);
+
+      // Show toast
+      setToastMessage(
+        newFilesToAdd.length === 1
+          ? `'${lastFile.name}' 파일을 열었습니다.`
+          : `${newFilesToAdd.length}개 파일을 탐색기에서 에디터로 열었습니다.`
+      );
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  }, [setDocument]);
 
   // Add new file
   const handleAddFile = useCallback((name: string, language: SupportedLanguage) => {
@@ -186,7 +237,7 @@ export default function App() {
             <Code2 className="w-4 h-4" />
           </div>
           <span className="text-base font-bold tracking-tight text-neutral-100">
-            CodeMirror 6 Studio
+            EG Edit
           </span>
         </div>
 
@@ -240,7 +291,7 @@ export default function App() {
         onDuplicateFile={handleDuplicateFile}
       />
 
-      {/* Toolbar: Language, Theme, Font, Layout, Actions */}
+      {/* Toolbar: Explorer toggle, Language, Theme, Font, Layout, Actions */}
       <EditorToolbar
         language={activeFile.language}
         onLanguageChange={handleLanguageChange}
@@ -254,41 +305,94 @@ export default function App() {
         isCopied={isCopied}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
+        isExplorerOpen={isExplorerOpen}
+        onToggleExplorer={() => setIsExplorerOpen(!isExplorerOpen)}
       />
 
-      {/* Main Workspace Canvas */}
-      <main className="flex-1 min-h-0 flex overflow-hidden">
-        {/* CodeMirror 6 Editor Container */}
-        <div
-          className={`h-full overflow-hidden flex flex-col ${
-            viewMode === 'editor'
-              ? 'w-full'
-              : viewMode === 'preview'
-              ? 'hidden'
-              : 'w-full lg:w-1/2 border-r border-neutral-800'
-          }`}
-        >
-          <div ref={containerRef} className="flex-1 h-full overflow-hidden" />
-        </div>
+      {/* Main Workspace Body with Explorer Sidebar and Editor Canvas */}
+      <div className="flex-1 min-h-0 flex overflow-hidden relative">
+        {/* Left: File Explorer Sidebar (with Drag and Drop support) */}
+        <FileExplorer
+          files={files}
+          activeFileId={activeFileId}
+          onSelectFile={handleSelectFile}
+          onCloseFile={handleCloseFile}
+          onAddFile={handleAddFile}
+          onDuplicateFile={handleDuplicateFile}
+          onFilesDropped={handleFilesDropped}
+          isOpen={isExplorerOpen}
+          onToggle={() => setIsExplorerOpen(!isExplorerOpen)}
+        />
 
-        {/* Live Preview / AST Inspector Container */}
-        <div
-          className={`h-full overflow-hidden flex flex-col ${
-            viewMode === 'preview'
-              ? 'w-full'
-              : viewMode === 'editor'
-              ? 'hidden'
-              : 'hidden lg:flex lg:w-1/2'
-          }`}
+        {/* Center/Right: Editor & Live Preview Canvas */}
+        <main
+          className="flex-1 min-h-0 flex overflow-hidden relative"
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsEditorDragging(true);
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsEditorDragging(false);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsEditorDragging(false);
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+              handleFilesDropped(e.dataTransfer.files);
+            }
+          }}
         >
-          <LivePreview
-            code={activeFile.content}
-            language={activeFile.language}
-            nodeInfo={currentSyntaxNode}
-            cursorPos={cursorPos}
-          />
-        </div>
-      </main>
+          {/* CodeMirror 6 Editor Container */}
+          <div
+            className={`h-full overflow-hidden flex flex-col relative ${
+              viewMode === 'editor'
+                ? 'w-full'
+                : viewMode === 'preview'
+                ? 'hidden'
+                : 'w-full lg:w-1/2 border-r border-neutral-800'
+            }`}
+          >
+            <div ref={containerRef} className="flex-1 h-full overflow-hidden" />
+          </div>
+
+          {/* Live Preview / AST Inspector Container */}
+          <div
+            className={`h-full overflow-hidden flex flex-col ${
+              viewMode === 'preview'
+                ? 'w-full'
+                : viewMode === 'editor'
+                ? 'hidden'
+                : 'hidden lg:flex lg:w-1/2'
+            }`}
+          >
+            <LivePreview
+              code={activeFile.content}
+              language={activeFile.language}
+              nodeInfo={currentSyntaxNode}
+              cursorPos={cursorPos}
+            />
+          </div>
+
+          {/* Global Drag-and-Drop Active Overlay over Editor */}
+          {isEditorDragging && (
+            <div className="absolute inset-0 bg-neutral-950/85 backdrop-blur-sm z-30 flex flex-col items-center justify-center p-6 text-center border-2 border-dashed border-indigo-500 pointer-events-none">
+              <div className="w-16 h-16 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 mb-3 animate-pulse">
+                <Upload className="w-8 h-8" />
+              </div>
+              <h3 className="text-base font-bold text-neutral-100">
+                파일을 에디터 창에 놓으세요
+              </h3>
+              <p className="text-xs text-neutral-400 mt-1 max-w-sm">
+                드래그한 파일이 즉시 에디터에 열리고 파일 확장자에 맞는 <strong>실시간 구문 하이라이팅</strong>이 바로 적용됩니다.
+              </p>
+            </div>
+          )}
+        </main>
+      </div>
 
       {/* Status Bar */}
       <StatusBar
@@ -300,6 +404,14 @@ export default function App() {
         theme={settings.theme}
         readOnly={settings.readOnly}
       />
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-10 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-neutral-900 border border-neutral-700 text-neutral-200 rounded-lg shadow-xl text-xs animate-in fade-in slide-in-from-bottom-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
 
       {/* Snippet Selection Modal */}
       <SnippetModal

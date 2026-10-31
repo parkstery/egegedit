@@ -28,6 +28,18 @@ export function getLanguageExtension(language: SupportedLanguage): Extension {
   }
 }
 
+export function detectLanguageFromFilename(fileName: string): SupportedLanguage {
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith('.ts') || lower.endsWith('.tsx')) return 'typescript';
+  if (lower.endsWith('.js') || lower.endsWith('.jsx') || lower.endsWith('.mjs') || lower.endsWith('.cjs')) return 'javascript';
+  if (lower.endsWith('.html') || lower.endsWith('.htm')) return 'html';
+  if (lower.endsWith('.css') || lower.endsWith('.scss') || lower.endsWith('.less')) return 'css';
+  if (lower.endsWith('.json')) return 'json';
+  if (lower.endsWith('.py')) return 'python';
+  if (lower.endsWith('.md') || lower.endsWith('.markdown')) return 'markdown';
+  return 'typescript';
+}
+
 export const LANGUAGE_OPTIONS: { id: SupportedLanguage; label: string; ext: string }[] = [
   { id: 'typescript', label: 'TypeScript (TSX)', ext: '.tsx' },
   { id: 'javascript', label: 'JavaScript (JSX)', ext: '.jsx' },
@@ -215,7 +227,7 @@ print("Telemetry analyzer initialized successfully.")
     name: 'config.json',
     language: 'json',
     content: `{
-  "application": "CodeMirror 6 Studio",
+  "application": "EG Edit",
   "version": "6.0.1",
   "engine": "Lezer Incremental Parser",
   "features": {
