@@ -1,0 +1,6 @@
+{
+  "name": "CodeMirror 6 Studio",
+  "description": "React 기반의 고성능 CodeMirror 6 코드 에디터 및 실시간 구문 하이라이팅 스튜디오",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
